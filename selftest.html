@@ -160,6 +160,34 @@ function suite() {
   const ascent = jittered.summary().ascent_m;
   check("jitter does not become phantom ascent", ascent < 5, `${ascent?.toFixed(1)} m`);
 
+  // A GPX file may carry several tracks and the first is often empty —
+  // GPSBabel and Garmin handhelds both emit that. Reading only the first one
+  // reports "nothing to plot" on a file holding a complete log.
+  const multiTrk = `<?xml version="1.0"?>
+<gpx version="1.0" xmlns="http://www.topografix.com/GPX/1/0">
+<trk><trkseg></trkseg></trk>
+<trk><trkseg>${pts.slice(0, 60).map(p =>
+    `<trkpt lat="${p.lat}" lon="${p.lon}"><ele>${p.ele}</ele><time>${iso(p.t)}</time></trkpt>`).join("")}</trkseg></trk>
+<trk><trkseg>${pts.slice(60).map(p =>
+    `<trkpt lat="${p.lat}" lon="${p.lon}"><ele>${p.ele}</ele><time>${iso(p.t)}</time></trkpt>`).join("")}</trkseg></trk>
+</gpx>`;
+  let multi = null;
+  try { multi = parseGpx(multiTrk, "multi.gpx"); } catch (e) { /* reported below */ }
+  check("every <trk> is read, not just the first", multi?.count === N,
+    `${multi?.count ?? "threw"} of ${N}`);
+
+  // Writers stamp every point with one instant, often the INT_MIN sentinel that
+  // reads as 1901. Believed, that is a 0:00 duration and a 0:00/km pace over a
+  // real distance — so the clock is dropped and the route still draws.
+  const frozen = parseGpx(`<?xml version="1.0"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>${pts.map(p =>
+    `<trkpt lat="${p.lat}" lon="${p.lon}"><ele>${p.ele}</ele><time>1901-12-13T20:45:52Z</time></trkpt>`).join("")}</trkseg></trk></gpx>`, "frozen.gpx");
+  const fs = frozen.summary();
+  check("a clock that never ran yields no pace", fs.duration_s == null && fs.pace_s_per_km == null,
+    `${fs.duration_s} s, pace ${fs.pace_s_per_km}`);
+  check("...but the route still survives it", frozen.bounds() !== null && fs.distance_m > 0,
+    `${fs.distance_m?.toFixed(0)} m`);
+
   for (const [name, fn] of [
     ["garbage rejected", () => parseGpx("<html>nope</html>")],
     ["empty TCX rejected", () => parseTcx("<TrainingCenterDatabase/>")],

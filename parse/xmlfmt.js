@@ -39,6 +39,19 @@ function deep(el, name) {
   return null;
 }
 
+// Every match, not just the first. A GPX file routinely carries several <trk>
+// elements and the first one is often empty — GPSBabel and Garmin handhelds
+// both emit that shape — so taking one track and calling it the track reports
+// "nothing to plot" on a file holding a complete log.
+function allDeep(el, name) {
+  const out = [], stack = [...el.children];
+  while (stack.length) {
+    const c = stack.shift();
+    if (local(c) === name) out.push(c); else stack.push(...c.children);
+  }
+  return out;
+}
+
 function num(el, name) {
   const c = el && child(el, name);
   if (!c) return null;
@@ -115,14 +128,17 @@ export function parseGpx(text, sourceFile = "") {
   const root = parseXml(text);
   const act = new Activity({ sourceFormat: "gpx", sourceFile });
 
-  const trk = deep(root, "trk");
-  if (!trk) throw new XmlError("no <trk> element");
-  const name = child(trk, "name")?.textContent.trim();
-  const type = child(trk, "type")?.textContent.trim().toLowerCase();
+  const trks = allDeep(root, "trk");
+  if (!trks.length) throw new XmlError("no <trk> element");
+  // Name and type come from the first track that states them; an empty leading
+  // track usually states neither.
+  const named = trks.find(t => child(t, "name") || child(t, "type")) ?? trks[0];
+  const name = child(named, "name")?.textContent.trim();
+  const type = child(named, "type")?.textContent.trim().toLowerCase();
   if (type) act.sport = type;
   if (name) act.sourceFile ||= name;
 
-  for (const seg of children(trk, "trkseg")) {
+  for (const seg of trks.flatMap(t => children(t, "trkseg"))) {
     for (const pt of children(seg, "trkpt")) {
       const when = time(child(pt, "time")?.textContent);
       if (!when) continue;

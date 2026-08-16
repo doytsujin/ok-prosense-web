@@ -84,7 +84,7 @@ dark surface — not an automatic inversion.
 
 Open [`selftest.html`](selftest.html). It generates a FIT, a TCX, a GPX and a
 JSON file in the page, reads each back, and checks them against each other —
-30 assertions, no fixtures on disk and no real location data. The title reads
+33 assertions, no fixtures on disk and no real location data. The title reads
 `PASS` or `FAIL (n)`.
 
 The interesting assertion is the cross-format one: FIT, TCX and JSON all

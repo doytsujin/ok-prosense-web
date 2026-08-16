@@ -78,6 +78,20 @@ export class Activity {
     const ts = this.samples.t;
     const base = ts.find(t => t != null);
     if (base == null) return;
+
+    // Many samples sharing one instant is not a zero-second activity, it is a
+    // file whose clock never ran — writers stamp every point with the same
+    // value, often the INT_MIN sentinel that reads as 1901. Taken at face value
+    // that yields a confident 0:00 duration and a 0:00/km pace over a real
+    // distance, so treat the channel as absent and let the route still draw.
+    const ms = t => (t instanceof Date ? t.getTime() : t);
+    const stamped = ts.filter(t => t != null);
+    if (stamped.length > 1 && ms(stamped[stamped.length - 1]) === ms(stamped[0])
+        && stamped.every(t => ms(t) === ms(base))) {
+      this.samples.t = ts.map(() => null);
+      return;
+    }
+
     if (this.startTime == null) this.startTime = base;
     const baseMs = base instanceof Date ? base.getTime() : base;
     this.samples.t = ts.map(t => {
@@ -145,7 +159,7 @@ export class Activity {
       duration_s: duration,
       moving_s: moving,
       distance_m: distance,
-      pace_s_per_km: distance > 0 ? moving / (distance / 1000) : null,
+      pace_s_per_km: distance > 0 && moving > 0 ? moving / (distance / 1000) : null,
       ascent_m: ascent,
       descent_m: descent,
       avg_hr: hr.length ? Math.round(avg(hr)) : null,
