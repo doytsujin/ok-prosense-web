@@ -133,6 +133,17 @@ function problems(failures) {
     could not be read.</strong><ul>${failures.map(f => `<li>${esc(f)}</li>`).join("")}</ul></div>`;
 }
 
+// Public test files from other projects' suites, so the page has something to
+// demonstrate on without shipping a fixture — and without any of my own
+// activities living in a public repository. Links only: following one is a
+// normal navigation to github.com, and the page still fetches nothing itself.
+// More of them, and what each reads as, are listed in the README.
+const SAMPLES = {
+  fit: "https://github.com/polyvertex/fitdecode/raw/master/tests/files/activity-small-fenix2-run.fit",
+  tcx: "https://github.com/firefly-cpp/tcx-test-files/raw/main/running/running_activity_1.tcx",
+  gpx: "https://github.com/tkrajina/gpxpy/raw/dev/test_files/cerknicko-jezero.gpx",
+};
+
 function renderEmpty(failures) {
   view.innerHTML = `${problems(failures)}${dropZone(false)}
     <div class="panel about">
@@ -146,6 +157,20 @@ function renderEmpty(failures) {
         accumulated: a threshold alone lets sensor jitter through, and a flat
         run can otherwise report hundreds of metres of climb that never
         happened.</p>
+    </div>
+    <div class="panel about">
+      <h3>No file to hand?</h3>
+      <p>Three public test files, one per format. Download one, then drop it
+        here. The links go to github.com; this page fetches nothing on its
+        own.</p>
+      <ul class="hint">
+        <li><a href="${SAMPLES.fit}" target="_blank" rel="noopener noreferrer">activity-small-fenix2-run.fit</a>
+          — FIT, 9 km run, 4 laps, heart rate throughout</li>
+        <li><a href="${SAMPLES.tcx}" target="_blank" rel="noopener noreferrer">running_activity_1.tcx</a>
+          — TCX, 14 km run, 15 laps</li>
+        <li><a href="${SAMPLES.gpx}" target="_blank" rel="noopener noreferrer">cerknicko-jezero.gpx</a>
+          — GPX, 13.7 km written as eight separate tracks</li>
+      </ul>
     </div>`;
 }
 

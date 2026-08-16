@@ -31,6 +31,58 @@ works.
 Format is detected from the content, not the extension, so a renamed export
 still works.
 
+## Files to try it on
+
+No fixture ships with this repository and none of my own activities are in it.
+The files below are public test data from other projects; each one was loaded
+through this page's parsers before being listed, and the figures in the last
+column are what the page reports. Download one and drop it on the page.
+
+| Format | File | What it reads as |
+|---|---|---|
+| **FIT** | [`activity-small-fenix2-run.fit`][f1] | 9.0 km run, 47 min, 4 laps — position, heart rate and elevation on every sample. The one to start with. |
+| **FIT** | [`garmin-edge-500-activity.fit`][f2] | 92.6 km ride, 3 h 32, 9 laps, 10 686 samples |
+| **FIT** | [`Activity.fit`][f3] | Garmin's own SDK fixture. It parses, but the samples are generated rather than recorded — exactly 1 m/s for an hour, and a heart rate that reaches 254. |
+| **TCX** | [`running_activity_1.tcx`][t1] | 14.3 km run, 54 min, 15 laps — enough laps that the splits table has something to say |
+| **TCX** | [`cycling_activity_1.tcx`][t2] | 116.4 km ride, 7 808 trackpoints, 5 MB of XML |
+| **GPX** | [`cerknicko-jezero.gpx`][g1] | 13.7 km over two hours, written as eight separate `<trk>` elements — the shape that reads as empty if you take only the first track |
+| **GPX** | [`Mojstrovka.gpx`][g2] | 184 points whose clock never ran: every stamp is the 1901 sentinel. Route and elevation profile draw; duration and pace stay blank instead of claiming 0:00 over 2.7 km. |
+
+There is no public JSON sample, because that schema is this project's own.
+[`selftest.html`](selftest.html) writes one in the page.
+
+More where those came from:
+
+- [polyvertex/fitdecode][s1] — `tests/files`, real dumps off an Edge 500/820 and
+  a fēnix 2/5, plus a pile of malformed ones (MIT)
+- [garmin/fit-javascript-sdk][s2] — `test/data`, Garmin's own FIT fixtures
+- [firefly-cpp/tcx-test-files][s3] — running, cycling, walking, swimming and
+  cross-country skiing (CC BY-SA 4.0)
+- [tkrajina/gpxpy][s4] — `test_files`, around thirty GPX files across 1.0 and
+  1.1, well-formed and not
+- [OpenStreetMap public traces][s5] — real uploads, downloadable as GPX without
+  an account
+
+None of the public GPX samples carry heart rate. GPX only has it when the writer
+adds Garmin's `TrackPointExtension`, which this page reads — a Strava or Garmin
+Connect export of your own is the quick way to see that path work.
+
+These are ordinary links to github.com. Nothing is fetched by the page itself,
+and dropping a downloaded file still sends nothing anywhere.
+
+[f1]: https://github.com/polyvertex/fitdecode/raw/master/tests/files/activity-small-fenix2-run.fit
+[f2]: https://github.com/polyvertex/fitdecode/raw/master/tests/files/garmin-edge-500-activity.fit
+[f3]: https://github.com/garmin/fit-javascript-sdk/raw/main/test/data/Activity.fit
+[t1]: https://github.com/firefly-cpp/tcx-test-files/raw/main/running/running_activity_1.tcx
+[t2]: https://github.com/firefly-cpp/tcx-test-files/raw/main/cycling/cycling_activity_1.tcx
+[g1]: https://github.com/tkrajina/gpxpy/raw/dev/test_files/cerknicko-jezero.gpx
+[g2]: https://github.com/tkrajina/gpxpy/raw/dev/test_files/Mojstrovka.gpx
+[s1]: https://github.com/polyvertex/fitdecode/tree/master/tests/files
+[s2]: https://github.com/garmin/fit-javascript-sdk/tree/main/test/data
+[s3]: https://github.com/firefly-cpp/tcx-test-files
+[s4]: https://github.com/tkrajina/gpxpy/tree/dev/test_files
+[s5]: https://www.openstreetmap.org/traces
+
 ## Numbers are derived, not copied
 
 Distance, pace, ascent and moving time come from the samples rather than from
