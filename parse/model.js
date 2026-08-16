@@ -84,10 +84,22 @@ export class Activity {
     // value, often the INT_MIN sentinel that reads as 1901. Taken at face value
     // that yields a confident 0:00 duration and a 0:00/km pace over a real
     // distance, so treat the channel as absent and let the route still draw.
+    //
+    // The test is the span, not equality: a writer emitting a sentinel may
+    // still vary it below the second — one real file differs in the fourth
+    // decimal of a second — and a span that small carries no information
+    // either way. No activity samples faster than 1 Hz, so a genuine two-point
+    // track spans at least a second and is left alone.
     const ms = t => (t instanceof Date ? t.getTime() : t);
-    const stamped = ts.filter(t => t != null);
-    if (stamped.length > 1 && ms(stamped[stamped.length - 1]) === ms(stamped[0])
-        && stamped.every(t => ms(t) === ms(base))) {
+    let lo = Infinity, hi = -Infinity, n = 0;
+    for (const t of ts) {
+      if (t == null) continue;
+      const v = ms(t);
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+      n++;
+    }
+    if (n > 1 && hi - lo < 1000) {
       this.samples.t = ts.map(() => null);
       return;
     }
