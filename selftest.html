@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trace — self test</title>
+<link rel="stylesheet" href="./style.css">
+<style>
+  .pass { color: var(--good); } .fail { color: var(--warn); font-weight: 600; }
+  pre { font-size: 12px; line-height: 1.6; overflow-x: auto; }
+</style>
+</head>
+<body>
+<header class="topbar"><h1>Trace</h1><span class="sub">self test</span></header>
+<main id="view">
+  <div class="panel">
+    <h3>Parser round-trip</h3>
+    <p class="hint">Each format is generated here and read back. Fixtures are
+      synthetic — a circle near the prime meridian — so this page carries no
+      real location data.</p>
+    <pre id="out">running…</pre>
+  </div>
+</main>
+<script type="module">
+import { parse as parseFit } from "./parse/fit.js";
+import { parseTcx, parseGpx } from "./parse/xmlfmt.js";
+import { fromJSON, haversine } from "./parse/model.js";
+
+/* -- synthetic fixtures ------------------------------------------------ */
+
+const N = 120, START = Date.UTC(2024, 4, 5, 6, 0, 0) / 1000;
+const pts = Array.from({ length: N }, (_, i) => ({
+  t: START + i * 5,
+  lat: 0.05 + 0.002 * Math.sin(i / 12),
+  lon: 0.05 + 0.002 * Math.cos(i / 12),
+  ele: 100 + 8 * Math.sin(i / 9),
+  hr: Math.round(120 + 18 * Math.sin(i / 15)),
+  cad: Math.round(160 + 6 * Math.sin(i / 7)),
+  dist: 0,
+}));
+
+// The stated distance has to be the track's actual length, or the check that
+// GPX (which has no distance field, so measures the track) agrees with the
+// formats that state one is comparing the fixture against itself and fails for
+// a reason that has nothing to do with the parsers.
+for (let i = 1; i < N; i++) {
+  pts[i].dist = pts[i - 1].dist
+    + haversine(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon);
+}
+
+const FIT_EPOCH = 631065600, DEG_TO_SEMI = 2 ** 31 / 180;
+
+function encodeFit() {
+  const parts = [];
+  const push = (...b) => parts.push(...b);
+  const u16 = v => [v & 255, (v >> 8) & 255];
+  const u32 = v => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  // sport message (global 12), then record definition (global 20)
+  push(0x41, 0, 0, ...u16(12), 1, 0, 1, 0x02, 0x01, 1);
+  const fields = [[253, 4, 0x86], [0, 4, 0x85], [1, 4, 0x85], [2, 2, 0x84],
+                  [3, 1, 0x02], [4, 1, 0x02], [5, 4, 0x86]];
+  push(0x40, 0, 0, ...u16(20), fields.length);
+  for (const f of fields) push(...f);
+  for (const p of pts) {
+    push(0x00, ...u32(p.t - FIT_EPOCH),
+      ...u32(Math.round(p.lat * DEG_TO_SEMI) >>> 0),
+      ...u32(Math.round(p.lon * DEG_TO_SEMI) >>> 0),
+      ...u16(Math.round((p.ele + 500) * 5)), p.hr, p.cad, ...u32(Math.round(p.dist * 100)));
+  }
+  const body = Uint8Array.from(parts);
+  const head = new Uint8Array(12);
+  head[0] = 12; head[1] = 0x10;
+  new DataView(head.buffer).setUint32(4, body.length, true);
+  head.set([0x2e, 0x46, 0x49, 0x54], 8);                       // ".FIT"
+  const out = new Uint8Array(head.length + body.length + 2);    // + CRC placeholder
+  out.set(head); out.set(body, head.length);
+  return out.buffer;
+}
+
+const iso = t => new Date(t * 1000).toISOString().replace(/\.\d+Z$/, "Z");
+
+const encodeGpx = () => `<?xml version="1.0"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><type>running</type><trkseg>
+${pts.map(p => `<trkpt lat="${p.lat}" lon="${p.lon}"><ele>${p.ele}</ele><time>${iso(p.t)}</time>
+<extensions><gpxtpx:TrackPointExtension xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+<gpxtpx:hr>${p.hr}</gpxtpx:hr><gpxtpx:cad>${p.cad}</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>`).join("")}
+</trkseg></trk></gpx>`;
+
+const encodeTcx = () => `<?xml version="1.0"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+<Activities><Activity Sport="Running"><Lap StartTime="${iso(pts[0].t)}">
+<TotalTimeSeconds>${(N - 1) * 5}</TotalTimeSeconds>
+<DistanceMeters>${pts.at(-1).dist.toFixed(1)}</DistanceMeters><Calories>210</Calories><Track>
+${pts.map(p => `<Trackpoint><Time>${iso(p.t)}</Time>
+<Position><LatitudeDegrees>${p.lat}</LatitudeDegrees><LongitudeDegrees>${p.lon}</LongitudeDegrees></Position>
+<AltitudeMeters>${p.ele}</AltitudeMeters><DistanceMeters>${p.dist.toFixed(1)}</DistanceMeters>
+<HeartRateBpm><Value>${p.hr}</Value></HeartRateBpm><Cadence>${p.cad}</Cadence></Trackpoint>`).join("")}
+</Track></Lap></Activity></Activities></TrainingCenterDatabase>`;
+
+const asJson = () => ({
+  schema: 1, id: "t", sport: "running", start_time: iso(pts[0].t), device: "test",
+  samples: {
+    t: pts.map((p, i) => i * 5), d: pts.map(p => p.dist), lat: pts.map(p => p.lat),
+    lon: pts.map(p => p.lon), ele: pts.map(p => p.ele), hr: pts.map(p => p.hr),
+    cad: pts.map(p => p.cad),
+  },
+  laps: [{ index: 1, start_offset_s: 0, duration_s: (N - 1) * 5, distance_m: pts.at(-1).dist }],
+});
+
+/* -- checks ------------------------------------------------------------ */
+
+const results = [];
+const check = (name, cond, detail = "") =>
+  results.push(`${cond ? "PASS" : "FAIL"}  ${name.padEnd(46)} ${detail}`);
+
+const near = (a, b, tol) => a != null && Math.abs(a - b) <= tol;
+
+function suite() {
+  const cases = [
+    ["FIT", () => parseFit(encodeFit(), "t.fit")],
+    ["TCX", () => parseTcx(encodeTcx(), "t.tcx")],
+    ["GPX", () => parseGpx(encodeGpx(), "t.gpx")],
+    ["JSON", () => fromJSON(asJson(), "t.json")],
+  ];
+  const summaries = {};
+  for (const [name, fn] of cases) {
+    let a;
+    try { a = fn(); } catch (e) { check(`${name} parses`, false, e.message); continue; }
+    const s = a.summary();
+    summaries[name] = s;
+    check(`${name} parses`, true, `${a.count} samples`);
+    check(`${name} sample count`, a.count === N, `${a.count} of ${N}`);
+    check(`${name} heart rate present`, near(s.avg_hr, 120, 25), `avg ${s.avg_hr}`);
+    check(`${name} cadence present`, near(s.avg_cadence, 160, 12), `avg ${s.avg_cadence}`);
+    check(`${name} has a track`, a.bounds() !== null);
+    check(`${name} elapsed time`, near(s.duration_s, (N - 1) * 5, 1), `${s.duration_s}s`);
+  }
+
+  // GPX has no distance field, so its distance is haversine off the track and
+  // is allowed to differ; the others state it and must agree exactly.
+  const stated = ["FIT", "TCX", "JSON"].map(k => summaries[k]?.distance_m).filter(v => v != null);
+  check("stated distance agrees across formats",
+    stated.length === 3 && Math.max(...stated) - Math.min(...stated) < 1,
+    stated.map(v => v.toFixed(1)).join(" / "));
+  check("GPX distance derived from track is close",
+    near(summaries.GPX?.distance_m, summaries.FIT?.distance_m, summaries.FIT?.distance_m * 0.1),
+    `${summaries.GPX?.distance_m?.toFixed(0)} vs ${summaries.FIT?.distance_m?.toFixed(0)} m`);
+
+  // Ascent must not accumulate sensor noise. A flat track with +/-1.5 m of
+  // jitter should report ~0 m of climb, not hundreds.
+  const jittered = fromJSON({
+    schema: 1, sport: "running", start_time: iso(pts[0].t),
+    samples: {
+      t: pts.map((_, i) => i * 5), d: pts.map(p => p.dist),
+      ele: pts.map((_, i) => 100 + (i % 2 ? 1.5 : -1.5)),
+      lat: [], lon: [], hr: [], cad: [],
+    },
+  });
+  jittered.samples.lat = pts.map(p => p.lat);
+  jittered.samples.lon = pts.map(p => p.lon);
+  const ascent = jittered.summary().ascent_m;
+  check("jitter does not become phantom ascent", ascent < 5, `${ascent?.toFixed(1)} m`);
+
+  for (const [name, fn] of [
+    ["garbage rejected", () => parseGpx("<html>nope</html>")],
+    ["empty TCX rejected", () => parseTcx("<TrainingCenterDatabase/>")],
+    ["short FIT rejected", () => parseFit(new Uint8Array(4).buffer)],
+  ]) {
+    let threw = false;
+    try { fn(); } catch { threw = true; }
+    check(name, threw);
+  }
+}
+
+suite();
+const failed = results.filter(r => r.startsWith("FAIL")).length;
+document.getElementById("out").innerHTML =
+  results.map(r => `<span class="${r.startsWith("PASS") ? "pass" : "fail"}">${r}</span>`).join("\n")
+  + `\n\n${results.length - failed} passed, ${failed} failed`;
+document.title = failed ? `FAIL (${failed})` : "PASS";
+</script>
+</body>
+</html>

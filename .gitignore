@@ -1,0 +1,8 @@
+# Nothing derived from real activity data belongs in a public repo.
+_fix/
+_selftest.html
+*.fit
+*.tcx
+*.gpx
+activities/
+node_modules/

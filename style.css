@@ -1,0 +1,295 @@
+/* Palette roles come from the data-viz reference palette. Light and dark are
+   both selected sets, not an automatic inversion. The OS setting is honoured by
+   the media query; the in-page toggle stamps data-theme on <html> and must win
+   in both directions, hence the :not() guard and :where() specificity trick. */
+
+:root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;          /* chart surface */
+  --page: #f9f9f7;               /* page plane */
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --series-1: #2a78d6;
+  --series-1-soft: rgba(42, 120, 214, 0.14);
+  --good: #006300;
+  --warn: #8a4b00;
+
+  --radius: 10px;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --series-1: #3987e5;
+    --series-1-soft: rgba(57, 135, 229, 0.18);
+    --good: #0ca30c;
+    --warn: #d68a2a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --series-1: #3987e5;
+  --series-1-soft: rgba(57, 135, 229, 0.18);
+  --good: #0ca30c;
+  --warn: #d68a2a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--page);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  position: sticky;
+  top: 0;
+  z-index: 500;
+}
+
+.topbar h1 { font-size: 15px; margin: 0; letter-spacing: -0.01em; }
+.topbar .sub { color: var(--text-muted); font-size: 13px; }
+.topbar .spacer { flex: 1; }
+
+button.ghost {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+button.ghost:hover { background: var(--grid); }
+
+main { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+
+.back {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+.back:hover { color: var(--text-primary); }
+
+h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.015em; }
+.when { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; }
+
+/* -- stat tiles: a headline number is not a one-bar bar chart -- */
+.kpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.tile { background: var(--surface-1); padding: 14px 16px; }
+.tile .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.tile .value { font-size: 24px; letter-spacing: -0.02em; }
+.tile .value .unit { font-size: 13px; color: var(--text-secondary); margin-left: 3px; }
+
+.panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.panel > h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+.panel > .hint { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; }
+
+/* -- charts -- */
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart .tick { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .baseline { stroke: var(--axis); stroke-width: 1; }
+.chart .series { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .area { fill: var(--series-1-soft); stroke: none; }
+.chart .bar { fill: var(--series-1); }
+.chart .crosshair { stroke: var(--axis); stroke-width: 1; }
+.chart .marker { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12px;
+  color: var(--text-primary);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 90ms ease;
+  z-index: 600;
+}
+.tooltip.on { opacity: 1; }
+.tooltip .k { color: var(--text-muted); margin-right: 6px; }
+.tooltip .v { font-variant-numeric: tabular-nums; }
+
+/* -- tables: identity is never colour alone; every chart has a table view -- */
+details.tableview { margin-top: 10px; }
+details.tableview summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }
+th, td {
+  text-align: right;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+tbody tr:hover { background: var(--grid); }
+tbody tr.clickable { cursor: pointer; }
+td a { text-decoration: none; }
+td a:hover { text-decoration: underline; }
+
+/* -- map -- */
+#map { height: 380px; border-radius: 8px; z-index: 1; }
+.leaflet-container { background: var(--grid); font-family: var(--sans); }
+.map-empty {
+  height: 140px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+.empty code {
+  background: var(--grid);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.banner {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--series-1);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--surface-1);
+  margin-bottom: 20px;
+}
+
+@media (max-width: 640px) {
+  .tile .value { font-size: 20px; }
+  #map { height: 260px; }
+}
+
+/* -- Trace: drop zone, footer, warnings ------------------------------- */
+
+.drop {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 42px 20px;
+  text-align: center;
+  background: var(--surface-1);
+  transition: border-color .12s, background .12s;
+  margin-bottom: 18px;
+}
+.drop.compact { padding: 20px; }
+.drop.over { border-color: var(--series-1); background: var(--page); }
+.drop .big { font-size: 18px; font-weight: 600; margin: 0 0 6px; color: var(--text-primary); }
+.drop .hint { margin: 0 0 14px; }
+
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--page);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--series-1); }
+
+.banner.warn { border-left: 3px solid var(--warn); }
+.banner.warn ul { margin: 6px 0 0 18px; padding: 0; }
+.banner.warn li { font-size: 13px; }
+
+.about p { max-width: 62ch; }
+.dim { color: var(--text-muted); }
+
+.foot {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 18px 22px 34px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.foot a { color: var(--text-muted); }
